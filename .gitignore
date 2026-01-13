@@ -1,0 +1,64 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+eggs/
+*.egg-info/
+*.egg
+
+# dots.ocr large files
+dots.ocr/weights/
+dots.ocr/output/
+*.ipynb_checkpoints/
+
+# Pipeline outputs (don't commit generated files)
+outputs/
+output/
+processed_images/
+ocr_pages/
+ocr_output/
+
+# Keep inputs directory structure but not large files
+inputs/*.pdf
+inputs/*.jpg
+inputs/*.jpeg
+inputs/*.png
+inputs/**/*.jpg
+inputs/**/*.jpeg
+inputs/**/*.png
+
+# Error reports and generated docs
+error_report.txt
+*.epub
+*_combined*.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Local config
+.env
+.env.local
