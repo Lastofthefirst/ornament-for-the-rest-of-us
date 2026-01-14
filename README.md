@@ -1,6 +1,6 @@
-# BookPipeline
+# Ornament for the Rest of Us
 
-Convert photographed book pages to EPUB with intelligent text processing. A complete pipeline for digitizing physical books using OCR with advanced text cleaning and error detection.
+Convert photographed book pages to EPUB with intelligent text processing. A complete pipeline for digitizing physical books using OCR with advanced text cleaning and error detection. Name is a reference to Zaynu'l-Muqarrabín.
 
 ## Features
 
