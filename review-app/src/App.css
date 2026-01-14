@@ -1,0 +1,919 @@
+/* ============================================
+   OCR Review App - Editorial/Archival Design
+   ============================================ */
+
+/* App Shell */
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--chrome);
+}
+
+/* ============================================
+   Header - Minimal, functional
+   ============================================ */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--paper);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.title::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.page-indicator {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  padding: var(--space-1) var(--space-3);
+  background: var(--chrome-light);
+  border-radius: var(--radius-sm);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Progress bar in header */
+.progress-bar {
+  width: 120px;
+  height: 4px;
+  background: var(--chrome-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width var(--transition-normal);
+}
+
+/* ============================================
+   Buttons - Refined, purposeful
+   ============================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.btn:hover::after {
+  opacity: 0.1;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn:disabled::after {
+  display: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-secondary {
+  background: var(--chrome-light);
+  color: var(--paper);
+  border: 1px solid var(--chrome-border);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.btn-ghost:hover {
+  color: var(--paper);
+}
+
+.btn-success {
+  background: var(--success);
+  color: white;
+}
+
+.btn-sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: 12px;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: var(--chrome-light);
+  color: var(--paper);
+  border-color: var(--chrome-light);
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================
+   Main Content - Split panels
+   ============================================ */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--chrome-border);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.main.with-suggestions {
+  grid-template-columns: 1fr 1fr 340px;
+}
+
+/* ============================================
+   Panels - The work surfaces
+   ============================================ */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  background: var(--paper-dark);
+  border-bottom: 1px solid var(--paper-dark);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-secondary);
+}
+
+.panel-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ============================================
+   Image Panel - Source document
+   ============================================ */
+.image-panel {
+  background: var(--chrome);
+}
+
+.image-panel .panel-header {
+  background: var(--chrome);
+  border-bottom-color: var(--chrome-border);
+}
+
+.image-panel .panel-title {
+  color: var(--ink-muted);
+}
+
+.image-container {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 0%, var(--chrome-light) 0%, transparent 50%),
+    var(--chrome);
+  min-height: 0;
+}
+
+.page-image {
+  max-width: 100%;
+  height: auto;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-sm);
+  transition: transform var(--transition-normal);
+}
+
+.zoom-controls {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.zoom-level {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+  padding: 0 var(--space-2);
+  display: flex;
+  align-items: center;
+}
+
+/* ============================================
+   Editor Panel - The manuscript
+   ============================================ */
+.editor-panel {
+  background: var(--paper-warm);
+}
+
+.editor-panel .panel-header {
+  background: var(--paper-warm);
+  border-bottom: 1px solid var(--paper-dark);
+}
+
+.text-editor-wrapper {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+.text-editor {
+  width: 100%;
+  height: 100%;
+  padding: var(--space-6) var(--space-7);
+  font-family: var(--font-body);
+  font-size: 18px;
+  line-height: 1.75;
+  color: var(--ink);
+  background: var(--paper-warm);
+  border: none;
+  resize: none;
+  overflow-y: auto;
+}
+
+.text-editor:focus {
+  outline: none;
+}
+
+/* Line numbers gutter */
+.text-editor-wrapper::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--space-6);
+  background: linear-gradient(90deg, var(--paper-dark) 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+}
+
+.status-badge.unsaved {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.status-badge.saved {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ============================================
+   Suggestions Panel - AI corrections
+   ============================================ */
+.suggestions-panel {
+  background: var(--chrome);
+  border-left: 1px solid var(--chrome-border);
+}
+
+.suggestions-panel .panel-header {
+  background: var(--chrome);
+  border-bottom-color: var(--chrome-border);
+}
+
+.suggestions-panel .panel-title {
+  color: var(--ink-muted);
+}
+
+.suggestion-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.suggestions-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.suggestion-card {
+  background: var(--chrome-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--chrome-border);
+  transition: border-color var(--transition-fast);
+}
+
+.suggestion-card:hover {
+  border-color: var(--ink-muted);
+}
+
+.suggestion-card.severity-high {
+  border-left: 3px solid var(--error);
+}
+
+.suggestion-card.severity-medium {
+  border-left: 3px solid var(--warning);
+}
+
+.suggestion-card.severity-low {
+  border-left: 3px solid var(--success);
+}
+
+.suggestion-header {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.suggestion-type {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  margin-bottom: var(--space-1);
+}
+
+.suggestion-desc {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--paper);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.suggestion-diff {
+  padding: var(--space-3);
+  background: var(--chrome);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.diff-line {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-1);
+}
+
+.diff-line.removed {
+  background: var(--error-bg);
+  color: var(--error);
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.diff-line.added {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.suggestion-actions {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--chrome-light);
+  border-top: 1px solid var(--chrome-border);
+}
+
+.suggestion-actions .btn {
+  flex: 1;
+}
+
+/* Keyboard hint in suggestions */
+.suggestion-kbd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: 11px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--chrome-border);
+}
+
+/* ============================================
+   Page Navigation - Film strip style
+   ============================================ */
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--chrome);
+  border-top: 1px solid var(--chrome-border);
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--chrome-light);
+  color: var(--paper);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.nav-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.page-strip {
+  flex: 1;
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: var(--space-1) 0;
+  scrollbar-width: thin;
+}
+
+.page-thumb {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  background: var(--chrome-light);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.page-thumb:hover {
+  color: var(--paper);
+  background: var(--chrome-border);
+}
+
+.page-thumb.active {
+  color: var(--paper);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.page-thumb.has-issues::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: var(--warning);
+  border-radius: 50%;
+  border: 2px solid var(--chrome);
+}
+
+.page-thumb.reviewed::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  border: 2px solid var(--chrome);
+}
+
+/* Page jump input */
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.page-jump-input {
+  width: 48px;
+  padding: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  color: var(--paper);
+  background: var(--chrome-light);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.page-jump-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.page-jump-label {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+/* ============================================
+   States - Loading, Empty, Error
+   ============================================ */
+.loading,
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  color: var(--ink-muted);
+  background: var(--chrome);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--chrome-border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-state-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--chrome-border);
+}
+
+.empty-state h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--paper);
+  margin: 0;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--ink-muted);
+  margin: 0;
+  max-width: 300px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--error);
+  color: white;
+  font-size: 13px;
+}
+
+.error-banner button {
+  margin-left: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* ============================================
+   Keyboard shortcuts overlay
+   ============================================ */
+.shortcuts-hint {
+  position: fixed;
+  bottom: var(--space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--chrome);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  color: var(--ink-muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+
+.app:focus-within .shortcuts-hint {
+  opacity: 1;
+}
+
+.shortcut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel {
+  animation: fadeIn 0.3s var(--ease-out);
+}
+
+.suggestion-card {
+  animation: slideUp 0.25s var(--ease-out);
+  animation-fill-mode: both;
+}
+
+.suggestion-card:nth-child(1) { animation-delay: 0ms; }
+.suggestion-card:nth-child(2) { animation-delay: 50ms; }
+.suggestion-card:nth-child(3) { animation-delay: 100ms; }
+.suggestion-card:nth-child(4) { animation-delay: 150ms; }
+.suggestion-card:nth-child(5) { animation-delay: 200ms; }
+
+/* ============================================
+   Folder Selection Screen
+   ============================================ */
+.folder-select {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--chrome);
+  min-height: 100vh;
+}
+
+.folder-select-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: 500px;
+  width: 100%;
+  padding: var(--space-8) var(--space-5);
+  animation: fadeIn 0.4s var(--ease-out);
+}
+
+.folder-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--chrome-light);
+  border-radius: var(--radius-lg);
+  color: var(--accent);
+  margin-bottom: var(--space-4);
+}
+
+.folder-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.folder-select h1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--paper);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.folder-select p {
+  font-size: 15px;
+  color: var(--ink-muted);
+  margin: 0;
+  text-align: center;
+}
+
+.folder-input-group {
+  display: flex;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-4);
+}
+
+.folder-input {
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--paper);
+  background: var(--chrome-light);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+
+.folder-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.folder-input::placeholder {
+  color: var(--ink-muted);
+}
+
+.folder-error {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--error-bg);
+  color: var(--error);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  text-align: center;
+  animation: slideUp 0.2s var(--ease-out);
+}
+
+.folder-hint {
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  background: var(--chrome-light);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.folder-hint p {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.folder-hint code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-secondary);
+  background: var(--chrome);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-2);
+}
+
+/* ============================================
+   Responsive adjustments
+   ============================================ */
+@media (max-width: 1200px) {
+  .main.with-suggestions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .suggestions-panel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 340px;
+    z-index: 10;
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+@media (max-width: 900px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .image-panel {
+    display: none;
+  }
+}
