@@ -18,6 +18,7 @@ from .text_cleaner import (
     clean_markdown_text,
     clean_book_pages,
     clean_repetition_hallucination,
+    remove_running_headers,
 )
 
 logger = logging.getLogger(__name__)
@@ -244,6 +245,11 @@ class BookPipeline:
         pages = clean_book_pages(pages, min_header_occurrences=10)
 
         joined, boundaries = joiner.join_pages(pages)
+
+        # Step 3: Remove running headers that interrupt sentences or duplicate
+        # previous headers (works best on joined text where context is available)
+        joined = remove_running_headers(joined)
+
         return joined
 
     def _generate_outputs(self, content: str) -> tuple[Path | None, Path | None]:

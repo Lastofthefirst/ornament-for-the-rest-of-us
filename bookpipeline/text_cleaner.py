@@ -266,8 +266,227 @@ def clean_markdown_text(text: str) -> str:
     return '\n\n'.join(cleaned_paragraphs)
 
 
+def _normalize_header(text: str) -> str:
+    """Normalize header text for comparison (case-insensitive, stripped)."""
+    return text.strip().upper()
+
+
+def _header_interrupts_sentence(text_before: str, text_after: str) -> bool:
+    """Check if a header interrupts a sentence using pysbd.
+
+    If the text before and after, when joined, form a valid continuous
+    sentence, then the header was interrupting that sentence.
+
+    Args:
+        text_before: Text immediately before the header
+        text_after: Text immediately after the header
+
+    Returns:
+        True if the header interrupts a sentence
+    """
+    import pysbd
+
+    # Clean up the text snippets - get last ~300 chars before, first ~300 after
+    before = text_before.strip()[-300:] if text_before else ""
+    after = text_after.strip()[:300] if text_after else ""
+
+    if not before or not after:
+        return False
+
+    # Strip HTML comments (page markers like <!-- page 41 -->)
+    before = re.sub(r'<!--.*?-->', '', before, flags=re.DOTALL).strip()
+    after = re.sub(r'<!--.*?-->', '', after, flags=re.DOTALL).strip()
+
+    # Strip chapter markers like *Chapter 6*, *Chapter* 7, etc. - these aren't sentences
+    before = re.sub(r'\*?Chapter\*?\s*\d+\*?', '', before, flags=re.IGNORECASE).strip()
+
+    # Check if "after" starts with something that looks like a new section:
+    # - Bold text like **Introduction**
+    # - Bullet points
+    # - Numbered lists
+    # - Blockquotes (epigraphs)
+    # NOTE: Check BEFORE stripping blockquote markers so we can detect them
+    after_first_line = after.split('\n')[0].strip()
+
+    # Strip markdown blockquote formatting for sentence analysis
+    before_clean = re.sub(r'^>\s*', '', before, flags=re.MULTILINE).strip()
+    after_clean = re.sub(r'^>\s*', '', after, flags=re.MULTILINE).strip()
+
+    if not before_clean or not after_clean:
+        return False
+    new_section_patterns = [
+        r'^\*\*[^*]+\*\*\s*$',  # Bold text line (like **Introduction**)
+        r'^\*\s+',              # Bullet point
+        r'^\d+\.\s+',           # Numbered list
+        r'^>\s*[A-Z"—]',        # Blockquote starting with uppercase/quote/em-dash (real epigraph)
+        r'^—',                  # Attribution line
+    ]
+    for pattern in new_section_patterns:
+        if re.match(pattern, after_first_line):
+            return False  # After starts a new section, not a continuation
+
+    seg = pysbd.Segmenter(language="en", clean=False)
+
+    # Check sentences in the "before" text
+    before_sentences = seg.segment(before_clean)
+    if not before_sentences:
+        return False
+
+    # Get the last sentence fragment from "before"
+    last_before = before_sentences[-1].strip()
+
+    # Check sentences in the "after" text
+    after_sentences = seg.segment(after_clean)
+    if not after_sentences:
+        return False
+
+    # Get the first sentence fragment from "after"
+    first_after = after_sentences[0].strip()
+
+    # Key insight: if "before" ends with a complete sentence, pysbd will have
+    # segmented it properly. If it doesn't end with terminal punctuation,
+    # the last "sentence" is actually incomplete.
+
+    # Check if the last part of "before" looks incomplete
+    # (doesn't end with sentence-ending punctuation)
+    terminal_punct = '.!?"'
+    superscripts = '⁰¹²³⁴⁵⁶⁷⁸⁹'
+
+    # Strip trailing footnotes/superscripts to find actual ending
+    last_char_idx = len(last_before) - 1
+    while last_char_idx >= 0 and (last_before[last_char_idx] in superscripts or
+                                   last_before[last_char_idx].isdigit()):
+        last_char_idx -= 1
+
+    before_ends_sentence = (last_char_idx >= 0 and
+                            last_before[last_char_idx] in terminal_punct)
+
+    # If before ends with complete sentence, no interruption
+    if before_ends_sentence:
+        return False
+
+    # Check if "after" starts with lowercase (strong continuation signal)
+    after_starts_lowercase = (first_after and
+                              first_after[0].islower())
+
+    # If before doesn't end a sentence AND after starts lowercase = interruption
+    if after_starts_lowercase:
+        return True
+
+    # Additional check: try joining and see if it makes one sentence
+    # Only do this if the first_after looks like a real sentence continuation
+    # (not a title, not a short fragment)
+    if len(first_after) > 20 and not first_after.isupper():
+        joined = last_before + " " + first_after
+        joined_sentences = seg.segment(joined)
+        # If joining creates exactly one sentence, it was one sentence
+        if len(joined_sentences) == 1:
+            return True
+
+    return False
+
+
+def remove_running_headers(text: str) -> str:
+    """Remove running headers that interrupt sentences or duplicate previous headers.
+
+    Uses two heuristics:
+    1. Sentence interruption: If a header appears between text that doesn't end
+       a sentence and text that continues it, the header is a running header.
+       Uses pysbd for robust sentence boundary detection.
+    2. Duplicate detection: If we've seen a header with the same text before
+       (case-insensitive), subsequent occurrences are running headers.
+
+    Args:
+        text: Full document text with markdown headers
+
+    Returns:
+        Text with running headers removed
+    """
+    if not text:
+        return text
+
+    # Pattern to find markdown headers on their own line
+    header_pattern = re.compile(
+        r'^(#+\s+.+)$',
+        re.MULTILINE
+    )
+
+    # Track headers we've seen (normalized for case-insensitive comparison)
+    seen_headers: set[str] = set()
+
+    # Find all headers and their positions
+    headers_to_remove: list[tuple[int, int]] = []
+    removed_count = 0
+
+    for match in header_pattern.finditer(text):
+        header_line = match.group(1)
+        header_start = match.start()
+        header_end = match.end()
+
+        # Extract just the header text (without # prefix)
+        header_text = re.sub(r'^#+\s+', '', header_line).strip()
+        normalized = _normalize_header(header_text)
+
+        # Get context: text before and after the header
+        text_before = text[:header_start]
+        text_after = text[header_end:]
+
+        # Skip if this is at the very beginning (likely a real title)
+        if not text_before.strip():
+            seen_headers.add(normalized)
+            continue
+
+        # Heuristic 1: Check if header interrupts a sentence (using pysbd)
+        interrupts_sentence = _header_interrupts_sentence(text_before, text_after)
+
+        # Heuristic 2: Check if this is a duplicate header
+        is_duplicate = normalized in seen_headers
+
+        # Remove if either heuristic flags it
+        should_remove = False
+
+        if interrupts_sentence:
+            logger.debug(f"Running header (interrupts sentence): '{header_text[:50]}'")
+            should_remove = True
+        elif is_duplicate:
+            logger.debug(f"Running header (duplicate): '{header_text[:50]}'")
+            should_remove = True
+
+        if should_remove:
+            headers_to_remove.append((header_start, header_end))
+            removed_count += 1
+        else:
+            # Track this header as seen
+            seen_headers.add(normalized)
+
+    if removed_count > 0:
+        logger.info(f"Removing {removed_count} running headers")
+
+    # Remove headers in reverse order to preserve positions
+    result = text
+    for start, end in reversed(headers_to_remove):
+        # Find the actual line boundaries
+        line_start = result.rfind('\n', 0, start)
+        line_start = line_start + 1 if line_start >= 0 else 0
+
+        line_end = result.find('\n', end)
+        line_end = line_end if line_end >= 0 else len(result)
+
+        # Remove the line
+        result = result[:line_start] + result[line_end:]
+
+    # Clean up multiple consecutive blank lines
+    result = re.sub(r'\n{3,}', '\n\n', result)
+
+    return result.strip()
+
+
 def detect_repeated_section_headers(pages: list[str], min_occurrences: int = 3, window_size: int = 20) -> set[str]:
     """Detect section headers that repeat across multiple pages within a window.
+
+    DEPRECATED: This function uses occurrence counting which is less accurate
+    than the sentence-interruption heuristic. Use remove_running_headers() on
+    joined text instead.
 
     These are running headers that OCR mistakenly categorized as Section-header
     instead of Page-header.

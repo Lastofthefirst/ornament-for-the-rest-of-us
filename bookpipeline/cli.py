@@ -136,6 +136,7 @@ def cmd_join(args: argparse.Namespace) -> int:
         process_page_from_json_file,
         clean_markdown_text,
         clean_book_pages,
+        remove_running_headers,
     )
 
     input_dir = Path(args.input)
@@ -164,6 +165,9 @@ def cmd_join(args: argparse.Namespace) -> int:
 
     joiner = PageJoiner(add_page_markers=not args.no_markers)
     joined, boundaries = joiner.join_pages(pages)
+
+    # Remove running headers that interrupt sentences or are duplicates
+    joined = remove_running_headers(joined)
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -11,7 +11,7 @@ Convert photographed book pages to EPUB with intelligent text processing. A comp
   - Dictionary-validated dehyphenation (joins words broken across lines only if valid)
   - Intelligent line unwrapping within paragraphs
   - OCR hallucination detection (removes 10+ consecutive repetitions)
-  - Running header detection (removes section headers misclassified by OCR)
+  - Running header removal using sentence-interruption detection (pysbd) and duplicate detection
   - Repeated header/footer removal (catches what JSON categories miss)
 - **Error Detection**: Automatic detection of OCR failures, garbled text, and quality issues
 - **Smart Page Joining**: Intelligently joins sentences broken across page boundaries
@@ -298,20 +298,27 @@ This commonly occurs when:
 
 ### Header/Footer Removal
 
-Three-stage approach:
+Multi-stage approach:
 1. **JSON categories**: Removes blocks marked as `Page-header`, `Page-footer`, `Page-number` by OCR
-2. **Repeated section headers**: Detects section headers (# or ##) that repeat within a 20-page window 3+ times - these are running headers that OCR misclassified. Keeps the first occurrence (actual section title), removes subsequent ones
-3. **Repetition analysis**: Detects phrases appearing on 10+ pages at top/bottom
+2. **Repetition analysis**: Detects phrases appearing on 10+ pages at top/bottom
+3. **Running header detection**: After pages are joined, uses two heuristics:
+   - **Sentence interruption**: If a header appears between text that doesn't end a sentence and text that continues it (detected using pysbd sentence boundary detection), it's a running header
+   - **Duplicate detection**: If we've seen a header with the same text before (case-insensitive), subsequent occurrences are running headers
 
 **Example:**
 ```
-Page 5:  # Introduction          ← Kept (first occurrence, actual section title)
-Page 7:  ## INTRODUCTION         ← Removed (running header)
-Page 9:  ## INTRODUCTION         ← Removed (running header)
-Page 11: ## INTRODUCTION         ← Removed (running header)
+# Minds, Machines, and Gods     ← Kept (real chapter title, first occurrence)
+...end of sentence.
+
+# MINDS, MACHINES, AND GODS     ← Removed (duplicate of chapter title)
+...continues text...
+
+...middle of a sentence
+# THROUGH THE LOOKING GLASS     ← Removed (interrupts sentence)
+that continues here...
 ```
 
-Keeps unique section headers like "Chapter 1", "Preface", etc. that only appear once.
+Real chapter titles are preserved while running headers (page headers that OCR misclassified as section headers) are removed.
 
 ## Photo Naming Best Practices
 
@@ -408,12 +415,11 @@ To fix:
 
 If you see section titles like "## INTRODUCTION" appearing multiple times throughout a chapter, these are running headers that OCR incorrectly categorized as section headers instead of page headers.
 
-The pipeline automatically detects and removes these:
-- Detects headers that repeat 3+ times within a 20-page window
-- Keeps the first occurrence (the actual section title)
-- Removes subsequent occurrences (running headers)
+The pipeline automatically detects and removes these using two heuristics:
+- **Sentence interruption**: Headers that cut off a sentence mid-flow are running headers
+- **Duplicate detection**: Headers that repeat the same text as a previous header are running headers
 
-This happens automatically in the `clean_book_pages()` function. No manual intervention needed.
+This happens automatically in the `remove_running_headers()` function after pages are joined. No manual intervention needed.
 
 ### Repeated text (hallucinations)
 
@@ -460,8 +466,7 @@ from bookpipeline.text_cleaner import (
     clean_text_block,
     clean_repetition_hallucination,
     detect_repeated_headers_footers,
-    detect_repeated_section_headers,
-    remove_repeated_section_headers
+    remove_running_headers
 )
 
 # Clean individual text block
@@ -480,13 +485,9 @@ headers, footers = detect_repeated_headers_footers(
     min_occurrences=10
 )
 
-# Find repeated section headers (running headers)
-repeated_headers = detect_repeated_section_headers(
-    pages,
-    min_occurrences=3,
-    window_size=20
-)
-pages = remove_repeated_section_headers(pages, repeated_headers)
+# Remove running headers from joined text (uses sentence boundary detection)
+joined_text = "\n\n".join(pages)
+cleaned_text = remove_running_headers(joined_text)
 ```
 
 ### Custom Error Detection
