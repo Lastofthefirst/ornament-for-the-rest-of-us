@@ -12,6 +12,13 @@ from .epub_builder import EPUBBuilder, EPUBMetadata
 from .ocr import OCRProcessor, OCRResult
 from .page_joiner import PageJoiner
 from .preprocessor import ImagePreprocessor
+from .text_cleaner import (
+    process_page_json,
+    process_page_from_json_file,
+    clean_markdown_text,
+    clean_book_pages,
+    clean_repetition_hallucination,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +58,17 @@ class BookPipeline:
         self._validate_config()
 
     def _setup_logging(self) -> None:
-        """Configure logging for the pipeline."""
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%H:%M:%S",
-        )
+        """Ensure logging is configured.
+
+        Only sets up a basic config if no handlers are configured,
+        allowing the CLI to control logging setup.
+        """
+        if not logging.root.handlers:
+            logging.basicConfig(
+                level=logging.INFO,
+                format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%H:%M:%S",
+            )
 
     def _validate_config(self) -> None:
         """Validate configuration before running."""
@@ -72,14 +84,22 @@ class BookPipeline:
         Returns:
             PipelineResult with output paths and status
         """
-        logger.info(f"Starting pipeline for: {self.config.book_title}")
-        logger.info(f"Input: {self.config.input_dir}")
-        logger.info(f"Output: {self.config.output_dir}")
+        import sys
+        import time
+
+        def step(num: int, name: str) -> None:
+            sys.stderr.write(f"\n[{num}/5] {name}\n")
+            sys.stderr.flush()
+
+        start_time = time.time()
+        sys.stderr.write(f"Processing: {self.config.book_title}\n")
+        sys.stderr.write(f"Input: {self.config.input_dir}\n")
+        sys.stderr.write(f"Output: {self.config.output_dir}\n")
+        sys.stderr.flush()
 
         try:
             # Step 1: Preprocess images
-            logger.info("=" * 50)
-            logger.info("STEP 1: Preprocessing images")
+            step(1, "Preprocessing images")
             processed_images = self._preprocess_images()
 
             if not processed_images:
@@ -92,39 +112,44 @@ class BookPipeline:
                 )
 
             # Step 2: Run OCR
-            logger.info("=" * 50)
-            logger.info("STEP 2: Running OCR")
+            step(2, "Running OCR")
             ocr_results = self._run_ocr(processed_images)
 
             # Step 3: Detect errors
-            logger.info("=" * 50)
-            logger.info("STEP 3: Analyzing OCR quality")
+            step(3, "Analyzing OCR quality")
             error_report = self._analyze_errors(ocr_results)
-
-            # Save error report
             self.config.error_report_path.write_text(error_report.summary())
-            logger.info(f"Error report saved to: {self.config.error_report_path}")
+
+            successful = sum(1 for r in ocr_results if r.success)
+            if error_report.error_count > 0:
+                sys.stderr.write(f"  {successful}/{len(ocr_results)} pages OK, {error_report.error_count} errors\n")
+            else:
+                sys.stderr.write(f"  {successful}/{len(ocr_results)} pages OK\n")
+            sys.stderr.flush()
 
             # Step 4: Join pages
-            logger.info("=" * 50)
-            logger.info("STEP 4: Joining pages")
+            step(4, "Joining pages")
             joined_text = self._join_pages(ocr_results)
 
             # Step 5: Generate outputs
-            logger.info("=" * 50)
-            logger.info("STEP 5: Generating outputs")
+            step(5, "Generating outputs")
             markdown_path, epub_path = self._generate_outputs(joined_text)
 
             # Summary
-            logger.info("=" * 50)
-            logger.info("PIPELINE COMPLETE")
-            logger.info(f"  Pages processed: {len(ocr_results)}")
-            logger.info(f"  Errors: {error_report.error_count}")
-            logger.info(f"  Warnings: {error_report.warning_count}")
+            elapsed = time.time() - start_time
+            mins = int(elapsed // 60)
+            secs = int(elapsed % 60)
+
+            sys.stderr.write(f"\n{'─' * 40}\n")
+            sys.stderr.write(f"Complete in {mins}m {secs}s\n")
+            sys.stderr.write(f"  Pages: {len(ocr_results)}\n")
             if markdown_path:
-                logger.info(f"  Markdown: {markdown_path}")
+                sys.stderr.write(f"  Markdown: {markdown_path}\n")
             if epub_path:
-                logger.info(f"  EPUB: {epub_path}")
+                sys.stderr.write(f"  EPUB: {epub_path}\n")
+            if error_report.error_count > 0:
+                sys.stderr.write(f"  Errors: {error_report.error_count} (see error_report.txt)\n")
+            sys.stderr.flush()
 
             return PipelineResult(
                 success=True,
@@ -145,9 +170,10 @@ class BookPipeline:
             )
 
     def _preprocess_images(self) -> list[Path]:
-        """Preprocess images: discover, sort, and fix rotation."""
+        """Preprocess images: discover, sort, fix rotation, and resize."""
         preprocessor = ImagePreprocessor(
-            supported_extensions=self.config.supported_extensions
+            supported_extensions=self.config.supported_extensions,
+            resize_target=self.config.resize_target,
         )
 
         # Discover images
@@ -163,7 +189,7 @@ class BookPipeline:
         else:
             sorted_infos = preprocessor.sort_by_filename(images)
 
-        # Copy to output with sequential names
+        # Process images: fix rotation, resize, save with sequential names
         processed = preprocessor.process_images(
             sorted_infos,
             self.config.processed_images_dir,
@@ -196,8 +222,6 @@ class BookPipeline:
 
     def _join_pages(self, ocr_results: list[OCRResult]) -> str:
         """Join OCR pages into single document."""
-        from .text_cleaner import process_page_json, clean_markdown_text, clean_book_pages
-
         joiner = PageJoiner(add_page_markers=self.config.add_page_markers)
 
         # Step 1: Process each page using JSON data for robust cleaning
@@ -208,7 +232,11 @@ class BookPipeline:
                 cleaned = process_page_json(r.json_data)
             else:
                 # Fallback to markdown cleaning
-                cleaned = clean_markdown_text(r.text_nohf)
+                # Still check for hallucination (repetition) in fallback path
+                text, had_hallucination = clean_repetition_hallucination(r.text_nohf)
+                if had_hallucination:
+                    logger.warning(f"Page {r.page_number}: cleaned hallucination in fallback path")
+                cleaned = clean_markdown_text(text)
             pages.append(cleaned)
 
         # Step 2: Secondary validation - remove repeated headers/footers
@@ -264,8 +292,6 @@ class BookPipeline:
         Returns:
             Joined text
         """
-        from .text_cleaner import process_page_from_json_file, clean_markdown_text
-
         # Prefer JSON files for robust processing
         json_files = sorted(self.config.ocr_output_dir.glob("**/page_*.json"))
 
@@ -280,6 +306,9 @@ class BookPipeline:
             for f in nohf_files:
                 text = f.read_text(encoding="utf-8")
                 pages.append(clean_markdown_text(text))
+
+        # Secondary validation - remove repeated headers/footers
+        pages = clean_book_pages(pages)
 
         joiner = PageJoiner(add_page_markers=self.config.add_page_markers)
         joined, _ = joiner.join_pages(pages)

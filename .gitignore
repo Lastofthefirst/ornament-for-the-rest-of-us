@@ -16,15 +16,16 @@ eggs/
 *.egg-info/
 *.egg
 
-# dots.ocr large files
-dots.ocr/weights/
-dots.ocr/output/
+# dots.ocr (external dependency - clone separately)
+dots.ocr/
 *.ipynb_checkpoints/
 
 # Pipeline outputs (don't commit generated files)
 outputs/
 output/
 processed_images/
+processed/
+processed./
 ocr_pages/
 ocr_output/
 
@@ -45,6 +46,7 @@ error_report.txt
 # IDE
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 *~
@@ -62,3 +64,5 @@ htmlcov/
 # Local config
 .env
 .env.local
+# Unrelated files
+Draft agreement.pdf

@@ -174,6 +174,9 @@ class EPUBBuilder:
         # Convert markdown to HTML
         html_body = self.md_converter.convert(markdown_text)
 
+        # Sanitize HTML to valid XHTML
+        html_body = self._sanitize_html_to_xhtml(html_body)
+
         # Wrap in XHTML document
         xhtml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -189,6 +192,36 @@ class EPUBBuilder:
 </html>'''
 
         return xhtml
+
+    def _sanitize_html_to_xhtml(self, html: str) -> str:
+        """Sanitize HTML to be valid XHTML.
+
+        Fixes common issues:
+        - Unclosed tags (br, hr, img, etc.)
+        - Unescaped ampersands
+        - Invalid characters
+
+        Args:
+            html: Raw HTML from markdown converter
+
+        Returns:
+            Sanitized XHTML
+        """
+        # Fix self-closing tags for XHTML compliance
+        # The markdown library outputs <br> but XHTML needs <br/>
+        html = re.sub(r'<(br|hr|img)([^/>]*)(?<!/)>', r'<\1\2/>', html)
+
+        # Fix unclosed img tags with attributes
+        html = re.sub(r'<img([^>]+)(?<!/)>', r'<img\1/>', html)
+
+        # Escape bare ampersands (but not already-escaped entities)
+        # Match & not followed by #, letter, or already part of entity
+        html = re.sub(r'&(?!#?\w+;)', '&amp;', html)
+
+        # Remove control characters that are invalid in XML
+        html = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', html)
+
+        return html
 
     def _container_xml(self) -> str:
         """Generate META-INF/container.xml."""

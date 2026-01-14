@@ -49,6 +49,7 @@ def cmd_process(args: argparse.Namespace) -> int:
         book_author=args.author,
         language=args.language,
         sort_by_timestamp=not args.sort_by_name,
+        resize_target=args.resize_target,
         ocr_backend=args.backend,
         ocr_threads=args.threads,
         dots_ocr_path=Path(args.dots_ocr) if args.dots_ocr else None,
@@ -76,7 +77,7 @@ def cmd_preprocess(args: argparse.Namespace) -> int:
     """Preprocess images only."""
     from .preprocessor import ImagePreprocessor
 
-    preprocessor = ImagePreprocessor()
+    preprocessor = ImagePreprocessor(resize_target=args.resize_target)
     images = preprocessor.discover_images(Path(args.input))
 
     if not images:
@@ -131,21 +132,35 @@ def cmd_ocr(args: argparse.Namespace) -> int:
 def cmd_join(args: argparse.Namespace) -> int:
     """Join OCR output pages."""
     from .page_joiner import PageJoiner
+    from .text_cleaner import (
+        process_page_from_json_file,
+        clean_markdown_text,
+        clean_book_pages,
+    )
 
     input_dir = Path(args.input)
 
-    # Find _nohf.md files
-    nohf_files = sorted(input_dir.glob("**/*_nohf.md"))
+    # Prefer JSON files for robust processing (like the full pipeline)
+    json_files = sorted(input_dir.glob("**/page_*.json"))
 
-    if not nohf_files:
-        # Try regular .md files
-        nohf_files = sorted(input_dir.glob("**/*.md"))
+    if json_files:
+        pages = [process_page_from_json_file(f) for f in json_files]
+    else:
+        # Fallback to markdown files
+        nohf_files = sorted(input_dir.glob("**/*_nohf.md"))
 
-    if not nohf_files:
-        print("No markdown files found", file=sys.stderr)
-        return 1
+        if not nohf_files:
+            # Try regular .md files
+            nohf_files = sorted(input_dir.glob("**/*.md"))
 
-    pages = [f.read_text(encoding="utf-8") for f in nohf_files]
+        if not nohf_files:
+            print("No markdown or JSON files found", file=sys.stderr)
+            return 1
+
+        pages = [clean_markdown_text(f.read_text(encoding="utf-8")) for f in nohf_files]
+
+    # Secondary validation - remove repeated headers/footers
+    pages = clean_book_pages(pages)
 
     joiner = PageJoiner(add_page_markers=not args.no_markers)
     joined, boundaries = joiner.join_pages(pages)
@@ -239,6 +254,8 @@ def main() -> int:
     p_process.add_argument("-a", "--author", default="Unknown", help="Book author")
     p_process.add_argument("-l", "--language", default="en", help="Language code (en, es, zh, etc.)")
     p_process.add_argument("--sort-by-name", action="store_true", help="Sort by filename instead of timestamp")
+    p_process.add_argument("--resize-target", type=int, default=1150,
+                          help="Resize images so short edge = this value (0 to disable, default: 1150)")
     p_process.add_argument("--backend", choices=["hf", "vllm"], default="hf", help="OCR backend")
     p_process.add_argument("--threads", type=int, default=8, help="OCR threads")
     p_process.add_argument("--dots-ocr", help="Path to dots.ocr directory")
@@ -259,6 +276,8 @@ def main() -> int:
     p_preprocess.add_argument("input", help="Input directory with images")
     p_preprocess.add_argument("-o", "--output", default="./processed", help="Output directory")
     p_preprocess.add_argument("--sort-by-name", action="store_true", help="Sort by filename instead of timestamp")
+    p_preprocess.add_argument("--resize-target", type=int, default=1150,
+                             help="Resize images so short edge = this value (0 to disable, default: 1150)")
     p_preprocess.set_defaults(func=cmd_preprocess)
 
     # ocr command
